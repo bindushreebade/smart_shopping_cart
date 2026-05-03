@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ShoppingBag, Sparkles, Tag, ArrowRight } from "lucide-react";
+import { ShoppingBag, Tag, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { BudgetBar } from "@/components/BudgetBar";
@@ -35,13 +35,7 @@ const Index = () => {
                 Drop items in the cart. The RFID reader scans them automatically.
               </p>
             </div>
-            <Link
-              to="/offers"
-              className="inline-flex h-11 items-center gap-2 rounded-xl bg-pink px-4 text-sm font-semibold text-pink-foreground shadow-pink transition-transform hover:scale-105"
-            >
-              <Tag className="h-4 w-4" />
-              See today's offers
-            </Link>
+
           </div>
         </motion.section>
 
@@ -82,8 +76,7 @@ const Index = () => {
               animate={{ opacity: 1, y: 0 }}
               className="flex h-full min-h-0 flex-col"
             >
-              <div className="mb-4 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
+              <div className="mb-4">
                 <h2 className="font-display text-xl font-semibold text-dark-green">Cart Summary</h2>
               </div>
 

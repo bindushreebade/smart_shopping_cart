@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { ShoppingCart, LayoutDashboard, Sparkles } from "lucide-react";
+import { ShoppingCart, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AppHeader() {
@@ -13,9 +13,7 @@ export function AppHeader() {
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-lg">
       <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
         <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl gradient-primary shadow-glow">
-            <Sparkles className="h-4 w-4 text-primary-foreground" />
-          </div>
+
           <span className="font-display text-lg font-extrabold tracking-tight">Smart<span className="text-primary">Cart</span></span>
         </Link>
         <nav className="flex items-center gap-1 rounded-full bg-secondary p-1">
@@ -31,8 +29,6 @@ export function AppHeader() {
                   active ? "bg-card shadow-card text-foreground" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Icon className="h-3.5 w-3.5" />
-                {t.label}
               </Link>
             );
           })}

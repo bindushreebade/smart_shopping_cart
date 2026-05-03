@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Sparkles, Package } from "lucide-react";
+import { Plus, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   addProductToCart,
@@ -20,7 +20,18 @@ interface Product {
   category: string | null;
   image_url: string | null;
   stock?: number;
+  aisle?: number;
+  shelf?: string;
 }
+
+const shuffle = <T,>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
 
 export function Recommendations({ items }: { items: CartItemRow[] }) {
   const [recs, setRecs] = useState<Product[]>([]);
@@ -64,18 +75,17 @@ export function Recommendations({ items }: { items: CartItemRow[] }) {
       let ranked = [...scores.entries()]
         .sort((a, b) => b[1] - a[1])
         .map(([productId]) => inventoryById.get(productId))
-        .filter((product): product is Product => Boolean(product))
-        .filter((product) => !cartProductIds.has(product.id));
+        .filter((product): product is typeof inventory[0] => Boolean(product));
 
       if (ranked.length < 6) {
         const seen = new Set(ranked.map((product) => product.id));
         const fallback = inventory
-          .filter((product) => !cartProductIds.has(product.id) && !seen.has(product.id))
+          .filter((product) => !seen.has(product.id))
           .sort((a, b) => b.stock - a.stock);
         ranked = [...ranked, ...fallback];
       }
 
-      setRecs(ranked.slice(0, 6));
+      setRecs(shuffle(ranked).slice(0, 6));
     };
 
     load();
@@ -92,7 +102,6 @@ export function Recommendations({ items }: { items: CartItemRow[] }) {
   return (
     <section className="rounded-2xl bg-card p-3 shadow-card md:p-4">
       <div className="mb-4 flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-primary" />
         <h2 className="font-display text-xl font-semibold text-dark-green md:text-2xl">
           {items.length ? "Frequently bought together" : "Popular picks"}
         </h2>
@@ -122,6 +131,13 @@ export function Recommendations({ items }: { items: CartItemRow[] }) {
                   </div>
                   <p className="line-clamp-2 text-[11px] font-semibold leading-tight text-dark-green">{productName}</p>
                   <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">{p.category}</p>
+                  {(p.aisle !== undefined || p.shelf !== undefined) && (
+                    <p className="mt-1 text-[9px] text-muted-foreground">
+                      {p.aisle !== undefined && <span>Aisle {p.aisle}</span>}
+                      {p.aisle !== undefined && p.shelf && <span> • </span>}
+                      {p.shelf && <span className="capitalize">{p.shelf}</span>}
+                    </p>
+                  )}
                   <div className="mt-1.5 flex items-center justify-between gap-1">
                     <span className="font-display text-xs font-bold tabular-nums text-dark-green">${Number(p.price).toFixed(2)}</span>
                     <button

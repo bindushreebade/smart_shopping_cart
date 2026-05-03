@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Tag, Receipt, LayoutDashboard, Sparkles } from "lucide-react";
+import { Home, Tag, Receipt, LayoutDashboard } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -31,12 +31,9 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border/20">
       <SidebarHeader className="border-b border-sidebar-border/30 px-3 py-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-accent shadow-soft">
-            <Sparkles className="h-5 w-5 text-sidebar-primary" />
-          </div>
           {!collapsed && (
             <div>
-              <p className="font-display text-base font-bold leading-tight text-sidebar-foreground">
+              <p className="font-display text-4xl font-extrabold leading-tight text-sidebar-foreground">
                 Smart<span className="text-primary-glow">Shop</span>
               </p>
               <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/60">RFID cart</p>

@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 /* Smart Shop Design System
-   Bright green primary, dark green accents, neutral gray, accent pink.
+   Mantis green primary, dark green accents, neutral gray, accent pink.
    All colors MUST be HSL.
 */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 80 10% 96%;
     --foreground: 140 70% 13%;            /* #0a3718 */
 
     --card: 0 0% 100%;
@@ -18,10 +18,10 @@
     --popover: 0 0% 100%;
     --popover-foreground: 140 70% 13%;
 
-    /* Primary = bright green #09ad09 */
-    --primary: 120 90% 36%;
+    /* Primary = mantis green #74c365 */
+    --primary: 107 44% 58%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 120 80% 46%;
+    --primary-glow: 107 49% 66%;
 
     /* Secondary = dark green surface */
     --secondary: 140 30% 94%;
@@ -49,7 +49,7 @@
     --destructive: 0 78% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 120 90% 36%;
+    --success: 107 44% 58%;
     --success-foreground: 0 0% 100%;
 
     --warning: 35 95% 55%;
@@ -57,17 +57,17 @@
 
     --border: 80 10% 90%;
     --input: 80 10% 92%;
-    --ring: 120 90% 36%;
+    --ring: 107 44% 58%;
 
     --radius: 1rem;
 
     /* Surfaces */
     --surface-soft: 80 10% 97%;
-    --surface-green: 140 40% 96%;
+    --surface-green: 120 50% 82%;
     --surface-pink: 329 80% 97%;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(120 90% 36%), hsl(140 90% 30%));
+    --gradient-primary: linear-gradient(135deg, hsl(107 44% 58%), hsl(132 34% 42%));
     --gradient-dark: linear-gradient(135deg, hsl(140 70% 13%), hsl(140 60% 20%));
     --gradient-pink: linear-gradient(135deg, hsl(329 70% 55%), hsl(320 75% 45%));
     --gradient-hero: linear-gradient(160deg, hsl(140 40% 97%) 0%, hsl(0 0% 100%) 60%);
@@ -75,22 +75,22 @@
 
     /* Shadows */
     --shadow-soft: 0 4px 14px -6px hsl(140 40% 25% / 0.12);
-    --shadow-glow: 0 10px 30px -10px hsl(120 90% 36% / 0.45);
+    --shadow-glow: 0 10px 30px -10px hsl(107 44% 58% / 0.45);
     --shadow-pink: 0 8px 24px -10px hsl(329 64% 52% / 0.35);
-    --shadow-card: 0 2px 10px -4px hsl(140 30% 25% / 0.08);
-    --shadow-elev: 0 12px 40px -12px hsl(140 40% 20% / 0.18);
+    --shadow-card: 0 4px 16px -4px hsl(140 30% 25% / 0.15);
+    --shadow-elev: 0 16px 48px -12px hsl(140 40% 20% / 0.25);
 
     --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
 
     /* Sidebar — dark green */
     --sidebar-background: 140 70% 13%;
     --sidebar-foreground: 140 20% 88%;
-    --sidebar-primary: 120 90% 46%;
+    --sidebar-primary: 107 49% 66%;
     --sidebar-primary-foreground: 140 70% 10%;
     --sidebar-accent: 140 50% 18%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 140 40% 22%;
-    --sidebar-ring: 120 90% 46%;
+    --sidebar-ring: 107 49% 66%;
   }
 
   .dark {
@@ -100,7 +100,7 @@
     --card-foreground: 140 20% 96%;
     --popover: 140 40% 12%;
     --popover-foreground: 140 20% 96%;
-    --primary: 120 90% 46%;
+    --primary: 107 49% 66%;
     --primary-foreground: 140 70% 10%;
     --secondary: 140 30% 18%;
     --secondary-foreground: 140 20% 96%;
@@ -112,7 +112,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 140 25% 22%;
     --input: 140 25% 22%;
-    --ring: 120 90% 46%;
+    --ring: 107 49% 66%;
   }
 }
 

@@ -14,7 +14,7 @@ export function BudgetBar({ spent, budget, onEditBudget }: Props) {
   const nearLimit = pct >= 80 && !overBudget;
 
   const fillColor = overBudget
-    ? "bg-pink"
+    ? "bg-red-500"
     : nearLimit
       ? "bg-warning"
       : "gradient-primary";
@@ -31,7 +31,7 @@ export function BudgetBar({ spent, budget, onEditBudget }: Props) {
           Budget
         </button>
         <div className="flex items-baseline gap-1 tabular-nums">
-          <span className={cn("text-base font-bold text-dark-green", overBudget && "text-pink")}>
+          <span className={cn("text-base font-bold text-dark-green", overBudget && "text-red-500")}>
             ${spent.toFixed(2)}
           </span>
           <span className="text-xs text-muted-foreground">/ ${budget.toFixed(2)}</span>
@@ -51,7 +51,7 @@ export function BudgetBar({ spent, budget, onEditBudget }: Props) {
           animate={{ opacity: 1, y: 0 }}
           className={cn(
             "mt-2 flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold",
-            overBudget ? "bg-pink-soft text-pink" : "bg-warning/15 text-warning"
+            overBudget ? "bg-red-100 text-red-700" : "bg-warning/15 text-warning"
           )}
         >
           <AlertTriangle className="h-3.5 w-3.5" />

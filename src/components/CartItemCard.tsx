@@ -37,6 +37,11 @@ export const CartItemCard = forwardRef<HTMLDivElement, Props>(function CartItemC
       <div className="min-w-0 flex-1">
         <p className="truncate font-semibold text-xs">{productName}</p>
         <p className="text-[11px] text-muted-foreground">${Number(item.unit_price).toFixed(2)} each</p>
+        <div className="mt-1 flex gap-2 flex-wrap text-[10px] text-muted-foreground">
+          {product.aisle && <span>Aisle {product.aisle}</span>}
+          {product.shelf && <span className="capitalize">Shelf: {product.shelf}</span>}
+          {product.category && <span className="capitalize">{product.category}</span>}
+        </div>
         <div className="mt-1 flex items-center gap-1.5">
           <button
             type="button"

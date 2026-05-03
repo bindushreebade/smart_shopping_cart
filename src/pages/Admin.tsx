@@ -110,7 +110,7 @@ export default function Admin() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <section className="rounded-2xl bg-card p-5 shadow-card">
+          <section className="rounded-2xl bg-white p-5 shadow-card">
             <h2 className="mb-4 font-display text-base font-bold">Revenue - last 7 days</h2>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
@@ -128,7 +128,7 @@ export default function Admin() {
             </div>
           </section>
 
-          <section className="rounded-2xl bg-card p-5 shadow-card">
+          <section className="rounded-2xl bg-white p-5 shadow-card">
             <h2 className="mb-4 font-display text-base font-bold">Popular in active carts</h2>
             {popular.length === 0 ? (
               <p className="text-sm text-muted-foreground">No items in the local cart yet.</p>
@@ -146,7 +146,7 @@ export default function Admin() {
           </section>
         </div>
 
-        <section className="rounded-2xl bg-card p-5 shadow-card">
+        <section className="rounded-2xl bg-white p-5 shadow-card">
           <div className="mb-4 flex items-center gap-2">
             <Package className="h-4 w-4 text-primary" />
             <h2 className="font-display text-base font-bold">Inventory</h2>

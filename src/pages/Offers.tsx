@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Tag, Flame, Clock, Plus, Sparkles } from "lucide-react";
+import { Tag, Flame, Clock, Plus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { addProductToCart, getInventoryProducts, onInventoryChanged } from "@/lib/cart-store";
 import { toast } from "sonner";
@@ -138,8 +138,7 @@ export default function Offers() {
           </div>
         </motion.section>
 
-        <section className="flex items-center gap-3 rounded-3xl bg-surface-green p-5">
-          <Sparkles className="h-6 w-6 shrink-0 text-primary" />
+        <section className="rounded-3xl bg-surface-green p-5">
           <p className="text-sm text-dark-green">
             <span className="font-bold">Tip:</span> Stock updates now come from the local product catalog, so scan, cart, and admin stay in sync.
           </p>
