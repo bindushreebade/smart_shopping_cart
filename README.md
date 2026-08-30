@@ -1,4 +1,4 @@
-# Smart Shoppy Cart
+# Smart Shopping Cart
 
 A smart retail shopping and vendor management application built with React, TypeScript, Vite, Express, and MySQL. The project combines a customer-facing storefront with an admin dashboard, vendor-specific product inventory, JWT-secured admin access, and database-backed cart and order flows.
 
