@@ -1,0 +1,10 @@
+[
+  {
+    "id": "user-default-admin",
+    "email": "admin@smartshop.local",
+    "passwordHash": "$2b$10$cXjoGKxo6aQH6mfbEEBNQ.Jo0nlrE271fmepB2Bpu9e//bdPcxAtS",
+    "vendorId": "vendor-default",
+    "role": "vendor_admin",
+    "createdAt": "2026-08-30T14:13:08.828Z"
+  }
+]

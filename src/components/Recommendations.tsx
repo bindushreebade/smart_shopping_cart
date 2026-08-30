@@ -139,7 +139,7 @@ export function Recommendations({ items }: { items: CartItemRow[] }) {
                     </p>
                   )}
                   <div className="mt-1.5 flex items-center justify-between gap-1">
-                    <span className="font-display text-xs font-bold tabular-nums text-dark-green">${Number(p.price).toFixed(2)}</span>
+                    <span className="font-display text-xs font-bold tabular-nums text-dark-green">₹{Number(p.price).toFixed(2)}</span>
                     <button
                       onClick={async () => {
                         await addProductToCart(p.id);

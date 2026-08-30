@@ -71,7 +71,7 @@ export function AppShell({ children }: Props) {
           {count > 0 && (
             <Button asChild variant="hero" size="default" className="h-12 px-6 text-sm transition-all hover:scale-105 active:scale-95">
               <Link to="/checkout">
-                Checkout · ${totals.total.toFixed(2)}
+                Checkout · ₹{totals.total.toFixed(2)}
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>

@@ -80,7 +80,7 @@ export default function Orders() {
                     </div>
                     <div className="text-right">
                       <p className="font-display text-lg font-extrabold tabular-nums text-dark-green">
-                        ${Number(o.total).toFixed(2)}
+                        ₹{Number(o.total).toFixed(2)}
                       </p>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                         {o.payment_method}

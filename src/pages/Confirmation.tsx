@@ -52,11 +52,11 @@ export default function Confirmation() {
               <Row label="Method" value={tx.payment_method.toUpperCase()} />
               <Row label="Date" value={new Date(tx.created_at).toLocaleString()} />
               <hr className="my-3 border-border" />
-              <Row label="Subtotal" value={`$${Number(tx.subtotal).toFixed(2)}`} />
-              <Row label="Tax" value={`$${Number(tx.tax).toFixed(2)}`} />
+              <Row label="Subtotal" value={`₹${Number(tx.subtotal).toFixed(2)}`} />
+              <Row label="Tax" value={`₹${Number(tx.tax).toFixed(2)}`} />
               <div className="flex justify-between pt-2 font-display text-xl font-extrabold text-dark-green">
                 <span>Total paid</span>
-                <span className="tabular-nums text-primary">${Number(tx.total).toFixed(2)}</span>
+                <span className="tabular-nums text-primary">₹{Number(tx.total).toFixed(2)}</span>
               </div>
             </div>
           </motion.section>

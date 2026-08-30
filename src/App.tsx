@@ -7,6 +7,8 @@ import Index from "./pages/Index.tsx";
 import Checkout from "./pages/Checkout.tsx";
 import Confirmation from "./pages/Confirmation.tsx";
 import Admin from "./pages/Admin.tsx";
+import AdminLogin from "./pages/AdminLogin.tsx";
+import AdminSignup from "./pages/AdminSignup.tsx";
 import Offers from "./pages/Offers.tsx";
 import Orders from "./pages/Orders.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -26,6 +28,8 @@ const App = () => (
           <Route path="/orders" element={<Orders />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/confirmation/:id" element={<Confirmation />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/signup" element={<AdminSignup />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

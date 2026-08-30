@@ -65,7 +65,7 @@ export default function Checkout() {
                     {normalizeProductName(i.product?.name)} <span className="text-xs">x{i.quantity}</span>
                   </span>
                   <span className="tabular-nums text-foreground">
-                    ${(i.quantity * Number(i.unit_price)).toFixed(2)}
+                    ₹{(i.quantity * Number(i.unit_price)).toFixed(2)}
                   </span>
                 </div>
               ))}
@@ -73,21 +73,21 @@ export default function Checkout() {
             <hr className="my-3 border-border" />
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground">
-                <span>Subtotal</span><span className="tabular-nums">${totals.subtotal.toFixed(2)}</span>
+                <span>Subtotal</span><span className="tabular-nums">₹{totals.subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Tax (8%)</span><span className="tabular-nums">${totals.tax.toFixed(2)}</span>
+                <span>Tax (8%)</span><span className="tabular-nums">₹{totals.tax.toFixed(2)}</span>
               </div>
               <div className="flex justify-between pt-1 font-display text-xl font-extrabold text-dark-green">
                 <span>Total</span>
                 <span className={cn("tabular-nums", overBudget && "text-pink")}>
-                  ${totals.total.toFixed(2)}
+                  ₹{totals.total.toFixed(2)}
                 </span>
               </div>
             </div>
             {overBudget && (
               <div className="mt-3 rounded-xl bg-pink-soft px-3 py-2 text-xs font-semibold text-pink">
-                You are over your ${budget.toFixed(2)} budget. Adjust the cart to continue.
+                You are over your ₹{budget.toFixed(2)} budget. Adjust the cart to continue.
               </div>
             )}
           </section>
@@ -141,7 +141,7 @@ export default function Checkout() {
               {processing ? (
                 <><Loader2 className="h-5 w-5 animate-spin" /> Processing...</>
               ) : (
-                `Pay $${totals.total.toFixed(2)}`
+                `Pay ₹${totals.total.toFixed(2)}`
               )}
             </Button>
           </section>

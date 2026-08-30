@@ -1,9 +1,77 @@
 import { DEMO_PRODUCTS, type DemoProduct } from "@/lib/demo-products";
 
+const API_BASE = (import.meta.env.VITE_API_BASE as string) || "http://localhost:4000";
 const CART_KEY = "smartcart.items";
 const BUDGET_KEY = "smartcart.budget";
 const INVENTORY_KEY = "smartcart.inventory";
 const ORDERS_KEY = "smartcart.orders";
+const ADMIN_TOKEN_KEY = "smartshop-admin-token";
+
+function buildApiUrl(path: string, params?: Record<string, string | number | undefined>) {
+  const url = new URL(path, `${API_BASE.replace(/\/$/, "")}/`);
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  return url.toString();
+}
+
+export function getVendorStorageKey(baseKey: string, vendorId?: string): string {
+  const resolvedVendorId = vendorId ?? getCurrentVendorId();
+  return resolvedVendorId ? `${baseKey}.${resolvedVendorId}` : baseKey;
+}
+
+export function getCurrentVendorId(): string {
+  const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+  if (!token) return "1";
+
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return "1";
+
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const decoded = JSON.parse(atob(padded));
+    return decoded.vendorId || "1";
+  } catch {
+    return "1";
+  }
+}
+
+async function hydrateInventoryFromDatabase(): Promise<DemoProduct[]> {
+  const vendorId = getCurrentVendorId();
+
+  try {
+    const response = await fetch(buildApiUrl("/api/products", { vendorId }));
+    if (!response.ok) return [];
+
+    const rows = await response.json();
+    const mapped = (rows || []).map((product: any) => ({
+      id: String(product.product_id ?? product.id),
+      name: product.name ?? "Unnamed product",
+      price: Number(product.price ?? 0),
+      stock: Number(product.stock_quantity ?? product.stock ?? 0),
+      rfid_tag: product.rfid_tag ?? product.rfidTag ?? "",
+      image_url: product.image_url ?? "",
+      category: product.category ?? "General",
+      description: product.description ?? "",
+      aisle: Number(product.aisle?.match(/\d+/)?.[0] ?? 1),
+      shelf: String(product.shelf ?? "1"),
+    }));
+
+    if (mapped.length) {
+      writeJson(INVENTORY_KEY, mapped);
+      emit(INVENTORY_EVENT);
+    }
+
+    return mapped;
+  } catch {
+    return [];
+  }
+}
 
 export const TAX_RATE = 0.08;
 
@@ -50,26 +118,34 @@ function cloneProducts(products: DemoProduct[]) {
   return products.map((product) => ({ ...product }));
 }
 
-function readJson<T>(key: string, fallback: T): T {
+function readJson<T>(key: string, fallback: T, vendorId?: string): T {
+  const scopedKey = getVendorStorageKey(key, vendorId);
   try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
+    const raw = localStorage.getItem(scopedKey);
+    if (raw) return JSON.parse(raw) as T;
+
+    if (scopedKey !== key) {
+      const legacyRaw = localStorage.getItem(key);
+      if (legacyRaw) return JSON.parse(legacyRaw) as T;
+    }
+
+    return fallback;
   } catch {
     return fallback;
   }
 }
 
-function writeJson<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value));
+function writeJson<T>(key: string, value: T, vendorId?: string) {
+  localStorage.setItem(getVendorStorageKey(key, vendorId), JSON.stringify(value));
 }
 
 export function getStoredBudget(): number {
-  const value = localStorage.getItem(BUDGET_KEY);
+  const value = localStorage.getItem(getVendorStorageKey(BUDGET_KEY));
   return value ? parseFloat(value) : 100;
 }
 
 export function setStoredBudget(value: number) {
-  localStorage.setItem(BUDGET_KEY, String(value));
+  localStorage.setItem(getVendorStorageKey(BUDGET_KEY), String(value));
 }
 
 export function clearStoredCart() {
@@ -77,9 +153,10 @@ export function clearStoredCart() {
   emit(CART_EVENT);
 }
 
-export function ensureCartSession(): Promise<string> {
+export async function ensureCartSession(): Promise<string> {
+  await hydrateInventoryFromDatabase();
   ensureInventory();
-  if (!localStorage.getItem(CART_KEY)) {
+  if (!localStorage.getItem(getVendorStorageKey(CART_KEY))) {
     writeJson(CART_KEY, [] as CartEntry[]);
   }
   return Promise.resolve("local-cart");
@@ -88,24 +165,10 @@ export function ensureCartSession(): Promise<string> {
 export function ensureInventory(): DemoProduct[] {
   const existing = readJson<DemoProduct[]>(INVENTORY_KEY, []);
   if (existing.length === 0) {
-    const seeded = cloneProducts(DEMO_PRODUCTS);
-    writeJson(INVENTORY_KEY, seeded);
-    return seeded;
+    return [];
   }
 
-  const merged = DEMO_PRODUCTS.map((product) => {
-    const saved = existing.find((entry) => entry.id === product.id);
-    return saved ? { ...product, stock: saved.stock } : { ...product };
-  });
-
-  if (merged.length !== existing.length || merged.some((product, index) => {
-    const saved = existing[index];
-    return !saved || saved.id !== product.id || saved.stock !== product.stock;
-  })) {
-    writeJson(INVENTORY_KEY, merged);
-  }
-
-  return merged;
+  return existing;
 }
 
 export function getInventoryProducts(): DemoProduct[] {
@@ -125,9 +188,16 @@ function saveCartEntries(entries: CartEntry[]) {
   emit(CART_EVENT);
 }
 
-function saveInventoryProducts(products: DemoProduct[]) {
+export function saveInventoryProducts(products: DemoProduct[]) {
   writeJson(INVENTORY_KEY, products);
   emit(INVENTORY_EVENT);
+}
+
+export function appendInventoryProducts(products: DemoProduct[]) {
+  const current = getInventoryProducts();
+  const merged = [...current, ...products.filter((product) => !current.some((existing) => existing.id === product.id))];
+  saveInventoryProducts(merged);
+  return merged;
 }
 
 export function getStoredOrders(): OrderRow[] {
@@ -249,14 +319,84 @@ export async function checkoutCart(paymentMethod: string) {
     }
   }
 
+  const totals = calcTotals(items);
+  const vendorId = getCurrentVendorId();
+  const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+
+  const cartUrl = token
+    ? buildApiUrl(`/api/vendor/${vendorId}/carts`)
+    : buildApiUrl("/api/carts", { vendorId });
+
+  const cartResponse = await fetch(cartUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(
+      token
+        ? { cartNumber: 1, status: "active" }
+        : { vendorId, cartNumber: 1, status: "active" },
+    ),
+  });
+
+  if (!cartResponse.ok) {
+    const payload = await cartResponse.json().catch(() => ({}));
+    throw new Error(payload.message || "Could not create cart for this transaction");
+  }
+
+  const cart = await cartResponse.json();
+
+  const orderUrl = token
+    ? buildApiUrl(`/api/vendor/${vendorId}/orders`)
+    : buildApiUrl("/api/orders", { vendorId });
+
+  const orderResponse = await fetch(orderUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(
+      token
+        ? {
+            cartId: cart.cart_id,
+            totalAmount: totals.total,
+            paymentStatus: "paid",
+            items: items.map((item) => ({
+              product_id: item.product_id,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+            })),
+          }
+        : {
+            vendorId,
+            cartId: cart.cart_id,
+            totalAmount: totals.total,
+            paymentStatus: "paid",
+            items: items.map((item) => ({
+              product_id: item.product_id,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+            })),
+          },
+    ),
+  });
+
+  if (!orderResponse.ok) {
+    const payload = await orderResponse.json().catch(() => ({}));
+    throw new Error(payload.message || "Could not save the order to the database");
+  }
+
+  const orderPayload = await orderResponse.json();
+
   const updatedInventory = inventory.map((product) => {
     const item = items.find((cartItem) => cartItem.product_id === product.id);
     return item ? { ...product, stock: product.stock - item.quantity } : product;
   });
 
-  const totals = calcTotals(items);
   const order: OrderRow = {
-    id: makeId("txn"),
+    id: String(orderPayload.order_id ?? makeId("txn")),
     reference: `TXN-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
     subtotal: totals.subtotal,
     tax: totals.tax,

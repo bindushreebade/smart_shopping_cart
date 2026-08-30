@@ -18,7 +18,7 @@ interface Product {
 const banners = [
   { title: "Mega weekend sale", sub: "Up to 30% off fresh produce", tag: "Today only", emoji: "Fresh" },
   { title: "Buy 2, get 1 free", sub: "On all bakery items", tag: "Limited", emoji: "Bake" },
-  { title: "Snack stack", sub: "Flat $5 off snack bundles over $20", tag: "This week", emoji: "Snack" },
+  { title: "Snack stack", sub: "Flat ₹5 off snack bundles over ₹20", tag: "This week", emoji: "Snack" },
 ];
 
 export default function Offers() {
@@ -119,7 +119,7 @@ export default function Offers() {
                   <p className="line-clamp-2 text-sm font-semibold text-dark-green">{productName}</p>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{p.category}</p>
                   <div className="mt-2 flex items-center justify-between">
-                    <span className="font-display text-base font-bold text-dark-green">${Number(p.price).toFixed(2)}</span>
+                    <span className="font-display text-base font-bold text-dark-green">₹{Number(p.price).toFixed(2)}</span>
                     <button
                       type="button"
                       onClick={async () => {

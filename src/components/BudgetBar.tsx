@@ -32,9 +32,9 @@ export function BudgetBar({ spent, budget, onEditBudget }: Props) {
         </button>
         <div className="flex items-baseline gap-1 tabular-nums">
           <span className={cn("text-base font-bold text-dark-green", overBudget && "text-red-500")}>
-            ${spent.toFixed(2)}
+            ₹{spent.toFixed(2)}
           </span>
-          <span className="text-xs text-muted-foreground">/ ${budget.toFixed(2)}</span>
+          <span className="text-xs text-muted-foreground">/ ₹{budget.toFixed(2)}</span>
         </div>
       </div>
       <div className="relative h-3 overflow-hidden rounded-full bg-muted">

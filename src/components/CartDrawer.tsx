@@ -55,16 +55,16 @@ export function CartDrawer({ children }: Props) {
           <div className="mb-3 space-y-1 text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span>
-              <span className="tabular-nums text-foreground">${totals.subtotal.toFixed(2)}</span>
+              <span className="tabular-nums text-foreground">₹{totals.subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>Tax (8%)</span>
-              <span className="tabular-nums text-foreground">${totals.tax.toFixed(2)}</span>
+              <span className="tabular-nums text-foreground">₹{totals.tax.toFixed(2)}</span>
             </div>
             <div className="flex justify-between pt-1 font-display text-lg font-extrabold text-dark-green">
               <span>Total</span>
               <span className={cn("tabular-nums", overBudget && "text-destructive")}>
-                ${totals.total.toFixed(2)}
+                ₹{totals.total.toFixed(2)}
               </span>
             </div>
           </div>
