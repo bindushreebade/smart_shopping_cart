@@ -109,6 +109,7 @@ export type OrderRow = {
 const CART_EVENT = "smartcart:updated";
 const INVENTORY_EVENT = "smartcart:inventory";
 const ORDERS_EVENT = "smartcart:orders";
+const BUDGET_EVENT = "smartcart:budget";
 
 function emit(name: string) {
   window.dispatchEvent(new CustomEvent(name));
@@ -146,6 +147,7 @@ export function getStoredBudget(): number {
 
 export function setStoredBudget(value: number) {
   localStorage.setItem(getVendorStorageKey(BUDGET_KEY), String(value));
+  emit(BUDGET_EVENT);
 }
 
 export function clearStoredCart() {
@@ -414,6 +416,7 @@ export async function checkoutCart(paymentMethod: string) {
 
   saveInventoryProducts(updatedInventory);
   saveOrders([order, ...getStoredOrders()]);
+  setStoredBudget(0);
   clearStoredCart();
 
   return order;

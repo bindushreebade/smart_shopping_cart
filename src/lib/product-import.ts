@@ -5,7 +5,7 @@ export type ProductImportRow = {
   stock: number;
   aisle: string;
   shelf: string;
-  reorderLevel: number;
+  reorderLevel?: number;
   rfidTag?: string;
 };
 
@@ -58,7 +58,9 @@ export function normalizeProductRow(input: Record<string, any>): ProductImportRo
   const stock = Number(normalized.stock ?? normalized.stock_quantity ?? normalized.quantity ?? 0);
   const aisle = String(normalized.aisle ?? "A").trim() || "A";
   const shelf = String(normalized.shelf ?? "1").trim() || "1";
-  const reorderLevel = Number(normalized.reorderLevel ?? normalized.reorder_level ?? 10);
+  const rawReorderLevel = normalized.reorderLevel ?? normalized.reorder_level;
+  const hasReorderLevel = String(rawReorderLevel ?? "").trim() !== "";
+  const reorderLevel = Number(rawReorderLevel);
 
   if (!name) {
     throw new Error("Each product row must include a product name");
@@ -71,7 +73,7 @@ export function normalizeProductRow(input: Record<string, any>): ProductImportRo
     stock: Number.isFinite(stock) ? stock : 0,
     aisle,
     shelf,
-    reorderLevel: Number.isFinite(reorderLevel) ? reorderLevel : 10,
+    ...(hasReorderLevel && Number.isFinite(reorderLevel) ? { reorderLevel } : {}),
     rfidTag: normalized.rfidTag || normalized.rfid_tag || normalized.rfid || `RFID-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   };
 }

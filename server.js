@@ -189,6 +189,61 @@ async function ensureVendorCartRecords(vendorId, count = 1) {
   }
 }
 
+async function createOrder({ vendorId, cartId, totalAmount, paymentStatus, items }) {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [result] = await connection.query(
+      "INSERT INTO orders (vendor_id, cart_id, total_amount, payment_status) VALUES (?, ?, ?, ?)",
+      [vendorId, cartId || null, Number(totalAmount || 0), paymentStatus || "paid"],
+    );
+
+    const orderId = result.insertId;
+
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        const productId = Number(item.product_id ?? item.productId);
+        const quantity = Number(item.quantity || 0);
+        const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
+
+        if (!productId || !Number.isInteger(quantity) || quantity <= 0) continue;
+
+        const [stockResult] = await connection.query(
+          "UPDATE products SET stock_quantity = stock_quantity - ? WHERE product_id = ? AND vendor_id = ? AND stock_quantity >= ?",
+          [quantity, productId, vendorId, quantity],
+        );
+
+        if (stockResult.affectedRows === 0) {
+          throw new Error("Insufficient stock for one or more products");
+        }
+
+        await connection.query(
+          "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
+          [orderId, productId, quantity, unitPrice],
+        );
+      }
+    }
+
+    if (cartId) {
+      await connection.query(
+        "UPDATE carts SET status = 'inactive', last_seen = NOW() WHERE cart_id = ? AND vendor_id = ?",
+        [cartId, vendorId],
+      );
+    }
+
+    const [rows] = await connection.query("SELECT * FROM orders WHERE order_id = ?", [orderId]);
+    await connection.commit();
+    return rows[0];
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, message: "SmartShop API is running" });
 });
@@ -316,37 +371,10 @@ app.post("/api/carts", async (req, res) => {
 app.post("/api/orders", async (req, res) => {
   const { vendorId = 1, cartId, totalAmount, paymentStatus = "paid", items = [] } = req.body || {};
   const safeVendorId = Number(vendorId || 1);
-  const safeTotalAmount = Number(totalAmount || 0);
 
   try {
-    const [result] = await pool.query(
-      "INSERT INTO orders (vendor_id, cart_id, total_amount, payment_status) VALUES (?, ?, ?, ?)",
-      [safeVendorId, cartId || null, safeTotalAmount, paymentStatus],
-    );
-
-    const orderId = result.insertId;
-
-    if (Array.isArray(items) && items.length) {
-      for (const item of items) {
-        const productId = Number(item.product_id ?? item.productId);
-        const quantity = Number(item.quantity || 0);
-        const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
-
-        if (!productId || !quantity) continue;
-
-        await pool.query(
-          "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
-          [orderId, productId, quantity, unitPrice],
-        );
-      }
-    }
-
-    if (cartId) {
-      await pool.query("UPDATE carts SET status = 'inactive', last_seen = NOW() WHERE cart_id = ? AND vendor_id = ?", [cartId, safeVendorId]);
-    }
-
-    const [rows] = await pool.query("SELECT * FROM orders WHERE order_id = ?", [orderId]);
-    return res.status(201).json(rows[0]);
+    const order = await createOrder({ vendorId: safeVendorId, cartId, totalAmount, paymentStatus, items });
+    return res.status(201).json(order);
   } catch (error) {
     return res.status(500).json({ message: "Could not save the order to the database", error: error.message });
   }
@@ -385,14 +413,40 @@ app.post("/api/vendor/:vendorId/products/bulk", authMiddleware, vendorAccess, as
     const stock = Number(item.stock || item.stock_quantity || 0);
     const aisle = String(item.aisle || "A").trim() || "A";
     const shelf = String(item.shelf || "1").trim() || "1";
-    const reorderLevel = Number(item.reorderLevel || item.reorder_level || 10);
+    const hasReorderLevel = item.reorderLevel !== undefined && item.reorderLevel !== null && String(item.reorderLevel).trim() !== "";
+    const reorderLevel = hasReorderLevel ? Number(item.reorderLevel) : Number(item.reorder_level);
     const rfidTag = item.rfidTag || item.rfid_tag || `RFID-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     if (!name) continue;
 
+    const [existingRows] = await pool.query(
+      "SELECT product_id FROM products WHERE vendor_id = ? AND LOWER(name) = LOWER(?) LIMIT 1",
+      [req.params.vendorId, name],
+    );
+
+    if (existingRows.length) {
+      const fields = ["stock_quantity = stock_quantity + ?"];
+      const values = [stock];
+
+      if (hasReorderLevel && Number.isFinite(reorderLevel)) {
+        fields.push("reorder_level = ?");
+        values.push(reorderLevel);
+      }
+
+      values.push(existingRows[0].product_id, req.params.vendorId);
+      await pool.query(
+        `UPDATE products SET ${fields.join(", ")} WHERE product_id = ? AND vendor_id = ?`,
+        values,
+      );
+
+      const [rows] = await pool.query("SELECT * FROM products WHERE product_id = ?", [existingRows[0].product_id]);
+      inserted.push(rows[0]);
+      continue;
+    }
+
     const [result] = await pool.query(
       "INSERT INTO products (vendor_id, name, category, price, stock_quantity, rfid_tag, aisle, shelf, reorder_level, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
-      [req.params.vendorId, name, category, price, stock, rfidTag, aisle, shelf, reorderLevel],
+      [req.params.vendorId, name, category, price, stock, rfidTag, aisle, shelf, hasReorderLevel && Number.isFinite(reorderLevel) ? reorderLevel : 10],
     );
 
     const [rows] = await pool.query("SELECT * FROM products WHERE product_id = ?", [result.insertId]);
@@ -429,34 +483,12 @@ app.post("/api/vendor/:vendorId/carts", authMiddleware, vendorAccess, async (req
 app.post("/api/vendor/:vendorId/orders", authMiddleware, vendorAccess, async (req, res) => {
   const { cartId, totalAmount, paymentStatus = "paid", items = [] } = req.body || {};
 
-  const [result] = await pool.query(
-    "INSERT INTO orders (vendor_id, cart_id, total_amount, payment_status) VALUES (?, ?, ?, ?)",
-    [req.params.vendorId, cartId || null, Number(totalAmount || 0), paymentStatus],
-  );
-
-  const orderId = result.insertId;
-
-  if (Array.isArray(items) && items.length) {
-    for (const item of items) {
-      const productId = Number(item.product_id ?? item.productId);
-      const quantity = Number(item.quantity || 0);
-      const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
-
-      if (!productId || !quantity) continue;
-
-      await pool.query(
-        "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
-        [orderId, productId, quantity, unitPrice],
-      );
-    }
+  try {
+    const order = await createOrder({ vendorId: Number(req.params.vendorId), cartId, totalAmount, paymentStatus, items });
+    res.status(201).json(order);
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Could not save the order to the database" });
   }
-
-  if (cartId) {
-    await pool.query("UPDATE carts SET status = 'inactive', last_seen = NOW() WHERE cart_id = ? AND vendor_id = ?", [cartId, req.params.vendorId]);
-  }
-
-  const [rows] = await pool.query("SELECT * FROM orders WHERE order_id = ?", [orderId]);
-  res.status(201).json(rows[0]);
 });
 
 app.get("/api/vendor/:vendorId/inventory", authMiddleware, vendorAccess, async (req, res) => {

@@ -42,9 +42,12 @@ export function useCart() {
     if (!cartId) return;
     const off = onCartChanged(() => refresh(cartId));
     const offInventory = onInventoryChanged(() => refresh(cartId));
+    const onBudgetChanged = () => setBudget(getStoredBudget());
+    window.addEventListener("smartcart:budget", onBudgetChanged);
     return () => {
       off();
       offInventory();
+      window.removeEventListener("smartcart:budget", onBudgetChanged);
     };
   }, [cartId, refresh]);
 

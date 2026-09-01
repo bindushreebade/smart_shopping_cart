@@ -262,6 +262,12 @@ export default function Admin() {
     }
 
     void loadDashboard(vendorId);
+
+    const refreshTimer = window.setInterval(() => {
+      void loadDashboard(vendorId);
+    }, 5000);
+
+    return () => window.clearInterval(refreshTimer);
   }, [vendorId]);
 
   /* ---------------------------------------------------------------------- */
