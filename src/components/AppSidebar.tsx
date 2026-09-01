@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Tag, Receipt, LayoutDashboard } from "lucide-react";
+import { Home, Tag, LayoutDashboard } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -18,7 +18,6 @@ import { cn } from "@/lib/utils";
 const items = [
   { title: "Home", url: "/", icon: Home },
   { title: "Offers", url: "/offers", icon: Tag, accent: true },
-  { title: "Orders", url: "/orders", icon: Receipt },
   { title: "Admin", url: "/admin", icon: LayoutDashboard },
 ];
 

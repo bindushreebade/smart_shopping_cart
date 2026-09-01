@@ -12,12 +12,14 @@ import {
   TrendingUp,
   Package,
   ShoppingCart,
-  DollarSign,
+  IndianRupee,
   AlertCircle,
   Upload,
   Plus,
   FileSpreadsheet,
   X,
+  AlertTriangle,
+  LucideGitGraph,
 } from "lucide-react";
 import {
   BarChart,
@@ -32,6 +34,14 @@ import * as XLSX from "xlsx";
 
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -81,6 +91,15 @@ interface PopularRow {
 interface DailyRow {
   day: string;
   revenue: number;
+}
+
+interface TransactionRow {
+  id: string;
+  total: number;
+  createdAt: string;
+  paymentStatus: string;
+  itemCount: number;
+  itemSummary: string;
 }
 
 type StatusType = "success" | "error" | "info";
@@ -173,12 +192,19 @@ export default function Admin() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [popular, setPopular] = useState<PopularRow[]>([]);
   const [daily, setDaily] = useState<DailyRow[]>([]);
+  const [transactions, setTransactions] = useState<TransactionRow[]>([]);
 
   const [manualForm, setManualForm] = useState(emptyManualForm);
 
   const [vendorId, setVendorId] = useState<number | null>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const [isOrdersOpen, setIsOrdersOpen] = useState(false);
+  const [isLowStockOpen, setIsLowStockOpen] = useState(false);
+  const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -275,8 +301,16 @@ export default function Admin() {
   /* ---------------------------------------------------------------------- */
 
   function handleLogout() {
-    clearAdminToken();
+    setIsLogoutConfirmOpen(true);
+  }
 
+  async function confirmLogout() {
+    setIsLoggingOut(true);
+    
+    // Simulate logout delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    clearAdminToken();
     navigate("/admin/login");
   }
 
@@ -343,10 +377,40 @@ export default function Admin() {
             0,
         ),
 
+        payment_status:
+          String(order.payment_status ?? "paid").toLowerCase(),
+
         created_at:
           order.created_at ??
           new Date().toISOString(),
+
+        items: Array.isArray(order.items)
+          ? order.items.map((item: any) => ({
+              product_id: item.product_id ?? item.productId ?? "",
+              product_name: item.product_name ?? item.name ?? "Unknown product",
+              quantity: Number(item.quantity ?? 0),
+              unit_price: Number(item.unit_price ?? item.unitPrice ?? 0),
+            }))
+          : [],
       }));
+
+      setTransactions(
+        normalizedOrders.map((order) => {
+          const itemNames = order.items
+            .slice(0, 2)
+            .map((item: any) => item.product_name || "Item")
+            .join(", ");
+
+          return {
+            id: String(order.order_id ?? order.id ?? "txn"),
+            total: Number(order.total),
+            createdAt: order.created_at,
+            paymentStatus: order.payment_status,
+            itemCount: order.items.reduce((sum: number, item: any) => sum + Number(item.quantity ?? 0), 0),
+            itemSummary: order.items.length > 2 ? `${itemNames}, +${order.items.length - 2} more` : itemNames || "No items",
+          };
+        }),
+      );
 
       /* ------------------------- TODAY'S REVENUE ------------------------- */
 
@@ -369,8 +433,7 @@ export default function Admin() {
 
       const activeCarts = (cartRows ?? []).filter(
         (cart) =>
-          String(cart.status ?? "").toLowerCase() ===
-          "active",
+          String(cart.status ?? "").toLowerCase() === "active",
       ).length;
 
       /* ---------------------------- LOW STOCK ---------------------------- */
@@ -394,11 +457,41 @@ export default function Admin() {
         ),
       );
 
-      /*
-       * Leave this empty until you connect your popular-products
-       * backend endpoint/order-items query.
-       */
-      setPopular([]);
+      const orderItems = ((orderRows ?? []) as any[]).flatMap((order) => {
+        const items = Array.isArray(order.items) ? order.items : [];
+
+        return items.map((item: any) => ({
+          productId: String(item.product_id ?? item.productId ?? ""),
+          productName: String(item.product_name ?? item.name ?? "Unknown product"),
+          quantity: Number(item.quantity ?? 0),
+        }));
+      });
+
+      const productSales = new Map<string, { name: string; sold: number }>();
+
+      for (const item of orderItems) {
+        if (!item.productId) continue;
+
+        const current = productSales.get(item.productId) ?? { name: item.productName, sold: 0 };
+        current.sold += item.quantity;
+        current.name = item.productName || current.name;
+        productSales.set(item.productId, current);
+      }
+
+      const rankedPopular = [...productSales.entries()]
+        .map(([productId, entry]) => ({
+          productId,
+          name: entry.name,
+          sold: entry.sold,
+        }))
+        .sort((a, b) => b.sold - a.sold)
+        .slice(0, 5)
+        .map((entry) => ({
+          name: entry.name,
+          sold: entry.sold,
+        }));
+
+      setPopular(rankedPopular);
 
       /* -------------------------- 7-DAY REVENUE -------------------------- */
 
@@ -774,320 +867,180 @@ export default function Admin() {
           </p>
         </motion.section>
 
-        {/* --------------------------------------------------------------- */}
-        {/* PRODUCT MANAGEMENT                                              */}
-        {/* --------------------------------------------------------------- */}
-
-        <section className="rounded-2xl bg-white p-5 shadow-card">
-
-          <div className="mb-4 flex items-center justify-between gap-2">
-
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-primary" />
-
-              <h2 className="font-display text-base font-bold">
-                Add product inventory
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>
-                {productSummary.count} products
-              </span>
-
-              <span>•</span>
-
-              <span>
-                {productSummary.totalUnits} units
-              </span>
-            </div>
-
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-
-            {/* ----------------------------------------------------------- */}
-            {/* MANUAL ADD                                                  */}
-            {/* ----------------------------------------------------------- */}
-
-            <form
-              onSubmit={handleManualAdd}
-              className="grid gap-3 md:grid-cols-2"
-            >
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Product name
-                </label>
-
-                <Input
-                  value={manualForm.name}
-                  onChange={(event) =>
-                    setManualForm((previous) => ({
-                      ...previous,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="e.g. Basmati Rice 5kg"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Category
-                </label>
-
-                <Input
-                  value={manualForm.category}
-                  onChange={(event) =>
-                    setManualForm((previous) => ({
-                      ...previous,
-                      category: event.target.value,
-                    }))
-                  }
-                  placeholder="e.g. Grocery"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Selling price (₹)
-                </label>
-
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={manualForm.price}
-                  onChange={(event) =>
-                    setManualForm((previous) => ({
-                      ...previous,
-                      price: event.target.value,
-                    }))
-                  }
-                  placeholder="Enter price"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Stock quantity
-                </label>
-
-                <Input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={manualForm.stock}
-                  onChange={(event) =>
-                    setManualForm((previous) => ({
-                      ...previous,
-                      stock: event.target.value,
-                    }))
-                  }
-                  placeholder="Units available"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Aisle
-                </label>
-
-                <Input
-                  value={manualForm.aisle}
-                  onChange={(event) =>
-                    setManualForm((previous) => ({
-                      ...previous,
-                      aisle: event.target.value,
-                    }))
-                  }
-                  placeholder="e.g. A1"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Shelf
-                </label>
-
-                <Input
-                  value={manualForm.shelf}
-                  onChange={(event) =>
-                    setManualForm((previous) => ({
-                      ...previous,
-                      shelf: event.target.value,
-                    }))
-                  }
-                  placeholder="e.g. S2"
-                />
-              </div>
-
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Reorder level
-                </label>
-
-                <Input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={manualForm.reorderLevel}
-                  onChange={(event) =>
-                    setManualForm((previous) => ({
-                      ...previous,
-                      reorderLevel: event.target.value,
-                    }))
-                  }
-                  placeholder="Low-stock alert level"
-                />
-              </div>
-
-              <Button
-                type="submit"
-                disabled={
-                  isSaving ||
-                  !vendorId
-                }
-                className="md:self-end"
-              >
+        <div className="flex justify-start">
+          <Dialog open={isInventoryOpen} onOpenChange={setIsInventoryOpen}>
+            <DialogTrigger asChild>
+              <Button type="button" size="sm" variant="secondary" className="rounded-full px-4">
                 <Plus className="mr-2 h-4 w-4" />
-
-                {isSaving
-                  ? "Saving..."
-                  : "Add product"}
+                Add product
               </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl rounded-3xl">
+              <DialogHeader>
+                <DialogTitle>Add product inventory</DialogTitle>
+                <DialogDescription>
+                  Add a single product or upload a CSV/Excel file to restock the catalog.
+                </DialogDescription>
+              </DialogHeader>
 
-            </form>
-
-            {/* ----------------------------------------------------------- */}
-            {/* CSV / EXCEL IMPORT                                          */}
-            {/* ----------------------------------------------------------- */}
-
-            <div className="rounded-xl border border-dashed border-border bg-slate-50 p-4">
-
-              <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-                <FileSpreadsheet className="h-4 w-4 text-primary" />
-
-                CSV / Excel import
-              </div>
-
-              <label
-                className={cn(
-                  "flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-white px-4 py-6 text-center text-sm transition",
-                  isSaving
-                    ? "cursor-not-allowed opacity-60"
-                    : "cursor-pointer hover:bg-slate-50",
-                )}
-              >
-                <Upload className="mb-2 h-5 w-5 text-primary" />
-
-                <span className="font-medium text-foreground">
-                  Choose product file
-                </span>
-
-                <span className="mt-1 text-xs text-muted-foreground">
-                  CSV, XLSX or XLS
-                </span>
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv,.xlsx,.xls"
-                  className="hidden"
-                  onChange={handleFileSelected}
-                  disabled={isSaving}
-                />
-              </label>
-
-              {/* SELECTED FILE */}
-
-              {selectedFile && (
-                <div className="mt-3 flex items-center gap-3 rounded-lg border bg-white p-3">
-
-                  <FileSpreadsheet className="h-5 w-5 shrink-0 text-primary" />
-
-                  <div className="min-w-0 flex-1">
-
-                    <p className="truncate text-sm font-medium">
-                      {selectedFile.name}
-                    </p>
-
-                    <p className="text-xs text-muted-foreground">
-                      {(selectedFile.size / 1024).toFixed(1)} KB
-                    </p>
-
+              <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+                <form onSubmit={handleManualAdd} className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Product name</label>
+                    <Input
+                      value={manualForm.name}
+                      onChange={(event) => setManualForm((previous) => ({ ...previous, name: event.target.value }))}
+                      placeholder="e.g. Basmati Rice 5kg"
+                      required
+                    />
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={clearSelectedFile}
-                    disabled={isSaving}
-                    className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Category</label>
+                    <Input
+                      value={manualForm.category}
+                      onChange={(event) => setManualForm((previous) => ({ ...previous, category: event.target.value }))}
+                      placeholder="e.g. Grocery"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Selling price (₹)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={manualForm.price}
+                      onChange={(event) => setManualForm((previous) => ({ ...previous, price: event.target.value }))}
+                      placeholder="Enter price"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Stock quantity</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={manualForm.stock}
+                      onChange={(event) => setManualForm((previous) => ({ ...previous, stock: event.target.value }))}
+                      placeholder="Units available"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Aisle</label>
+                    <Input
+                      value={manualForm.aisle}
+                      onChange={(event) => setManualForm((previous) => ({ ...previous, aisle: event.target.value }))}
+                      placeholder="e.g. A1"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Shelf</label>
+                    <Input
+                      value={manualForm.shelf}
+                      onChange={(event) => setManualForm((previous) => ({ ...previous, shelf: event.target.value }))}
+                      placeholder="e.g. S2"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground">Reorder level</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={manualForm.reorderLevel}
+                      onChange={(event) => setManualForm((previous) => ({ ...previous, reorderLevel: event.target.value }))}
+                      placeholder="Low-stock alert level"
+                    />
+                  </div>
+
+                  <Button type="submit" disabled={isSaving || !vendorId} className="md:self-end">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {isSaving ? "Saving..." : "Add product"}
+                  </Button>
+                </form>
+
+                <div className="rounded-xl border border-dashed border-border bg-slate-50 p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+                    <FileSpreadsheet className="h-4 w-4 text-primary" />
+                    CSV / Excel import
+                  </div>
+
+                  <label
+                    className={cn(
+                      "flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-white px-4 py-6 text-center text-sm transition",
+                      isSaving ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-slate-50",
+                    )}
                   >
-                    <X className="h-4 w-4" />
-                  </button>
+                    <Upload className="mb-2 h-5 w-5 text-primary" />
+                    <span className="font-medium text-foreground">Choose product file</span>
+                    <span className="mt-1 text-xs text-muted-foreground">CSV, XLSX or XLS</span>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      className="hidden"
+                      onChange={handleFileSelected}
+                      disabled={isSaving}
+                    />
+                  </label>
 
+                  {selectedFile && (
+                    <div className="mt-3 flex items-center gap-3 rounded-lg border bg-white p-3">
+                      <FileSpreadsheet className="h-5 w-5 shrink-0 text-primary" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{selectedFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={clearSelectedFile}
+                        disabled={isSaving}
+                        className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="mt-3 w-full"
+                    onClick={handleFileUpload}
+                    disabled={!selectedFile || isSaving || !vendorId}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {isSaving ? "Uploading..." : "Upload selected file"}
+                  </Button>
+
+                  {!selectedFile && (
+                    <p className="mt-2 text-center text-xs text-muted-foreground">Select a file to enable upload.</p>
+                  )}
                 </div>
-              )}
+              </div>
 
-              {/* ACTUAL UPLOAD BUTTON */}
-
-              <Button
-                type="button"
-                variant="secondary"
-                className="mt-3 w-full"
-                onClick={handleFileUpload}
-                disabled={
-                  !selectedFile ||
-                  isSaving ||
-                  !vendorId
-                }
-              >
-                <Upload className="mr-2 h-4 w-4" />
-
-                {isSaving
-                  ? "Uploading..."
-                  : "Upload selected file"}
-              </Button>
-
-              {!selectedFile && (
-                <p className="mt-2 text-center text-xs text-muted-foreground">
-                  Select a file to enable upload.
+              {statusMessage && (
+                <p
+                  className={cn(
+                    "mt-4 rounded-md border px-3 py-2 text-sm",
+                    statusType === "success" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+                    statusType === "error" && "border-red-200 bg-red-50 text-red-700",
+                    statusType === "info" && "border-blue-200 bg-blue-50 text-blue-700",
+                  )}
+                >
+                  {statusMessage}
                 </p>
               )}
-
-            </div>
-
-          </div>
-
-          {/* ------------------------------------------------------------- */}
-          {/* STATUS MESSAGE                                                */}
-          {/* ------------------------------------------------------------- */}
-
-          {statusMessage && (
-            <p
-              className={cn(
-                "mt-4 rounded-md border px-3 py-2 text-sm",
-
-                statusType === "success" &&
-                  "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-                statusType === "error" &&
-                  "border-red-200 bg-red-50 text-red-700",
-
-                statusType === "info" &&
-                  "border-blue-200 bg-blue-50 text-blue-700",
-              )}
-            >
-              {statusMessage}
-            </p>
-          )}
-
-        </section>
+            </DialogContent>
+          </Dialog>
+        </div>
 
         {/* --------------------------------------------------------------- */}
         {/* STAT CARDS                                                      */}
@@ -1096,16 +1049,10 @@ export default function Admin() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
 
           <StatCard
-            icon={DollarSign}
+            icon={IndianRupee}
             label="Today's revenue"
             value={`₹${stats.todayRevenue.toFixed(2)}`}
             accent
-          />
-
-          <StatCard
-            icon={TrendingUp}
-            label="Total orders"
-            value={stats.totalOrders.toString()}
           />
 
           <StatCard
@@ -1119,6 +1066,124 @@ export default function Admin() {
             label="Low stock"
             value={stats.lowStock.toString()}
             warn={stats.lowStock > 0}
+            action={(
+              <Dialog open={isLowStockOpen} onOpenChange={setIsLowStockOpen}>
+                <DialogTrigger asChild>
+                  <Button type="button" size="sm" variant="secondary" className="h-7 rounded-full px-3 text-[11px]">
+                    View
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl rounded-3xl">
+                  <DialogHeader>
+                    <DialogTitle>Low-stock products</DialogTitle>
+                    <DialogDescription>Products that are at or below their reorder threshold.</DialogDescription>
+                  </DialogHeader>
+
+                  {products.filter((product) => product.stock <= product.reorderLevel).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No low-stock products right now.</p>
+                  ) : (
+                    <div className="max-h-[70vh] overflow-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                            <th className="py-2">Product</th>
+                            <th className="py-2">Category</th>
+                            <th className="py-2 text-right">Stock</th>
+                            <th className="py-2 text-right">Reorder</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {products
+                            .filter((product) => product.stock <= product.reorderLevel)
+                            .map((product) => (
+                              <tr
+                                key={product.id}
+                                className={cn(
+                                  "border-b border-border/50 last:border-0",
+                                  product.stock === 0
+                                    ? "bg-red-50/80"
+                                    : "bg-yellow-50/80",
+                                )}
+                              >
+                                <td className="py-3 font-medium">{normalizeProductName(product.name)}</td>
+                                <td className="py-3 text-muted-foreground">{product.category ?? "General"}</td>
+                                <td className="py-3 text-right tabular-nums">{product.stock}</td>
+                                <td className="py-3 text-right tabular-nums">{product.reorderLevel}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+            )}
+          />
+          <StatCard
+            icon={TrendingUp}
+            label="Orders"
+            value={stats.totalOrders.toString()}
+            action={(
+              <Dialog open={isOrdersOpen} onOpenChange={setIsOrdersOpen}>
+                <DialogTrigger asChild>
+                  <Button type="button" size="sm" variant="secondary" className="h-7 rounded-full px-3 text-[11px]">
+                    View
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl rounded-3xl">
+                  <DialogHeader>
+                    <DialogTitle>Your orders</DialogTitle>
+                    <DialogDescription>All transactions for this vendor are listed here.</DialogDescription>
+                  </DialogHeader>
+
+                  {transactions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No transactions yet.</p>
+                  ) : (
+                    <div className="max-h-[70vh] overflow-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                            <th className="py-2">Order</th>
+                            <th className="py-2">Date</th>
+                            <th className="py-2">Items</th>
+                            <th className="py-2 text-right">Amount</th>
+                            <th className="py-2 text-right">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {transactions.map((transaction) => (
+                            <tr key={transaction.id} className="border-b border-border/50 last:border-0">
+                              <td className="py-3 font-medium">#{transaction.id}</td>
+                              <td className="py-3 text-muted-foreground">
+                                {new Date(transaction.createdAt).toLocaleString([], {
+                                  dateStyle: "medium",
+                                  timeStyle: "short",
+                                })}
+                              </td>
+                              <td className="py-3 text-muted-foreground">
+                                <div className="max-w-xs truncate">{transaction.itemSummary}</div>
+                                <div className="text-[11px] text-muted-foreground/80">{transaction.itemCount} units</div>
+                              </td>
+                              <td className="py-3 text-right font-semibold tabular-nums">₹{Number(transaction.total).toFixed(2)}</td>
+                              <td className="py-3 text-right">
+                                <span className={cn(
+                                  "inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                                  transaction.paymentStatus === "paid"
+                                    ? "bg-success/10 text-success"
+                                    : transaction.paymentStatus === "pending"
+                                      ? "bg-warning/15 text-warning"
+                                      : "bg-destructive/10 text-destructive",
+                                )}>{transaction.paymentStatus}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+            )}
           />
 
         </div>
@@ -1302,7 +1367,14 @@ export default function Admin() {
                     return (
                       <tr
                         key={product.id}
-                        className="border-b border-border/50 last:border-0"
+                        className={cn(
+                          "border-b border-border/50 last:border-0",
+                          out
+                            ? "bg-red-50/90"
+                            : low
+                              ? "bg-yellow-50/90"
+                              : "",
+                        )}
                       >
 
                         <td className="py-3 font-medium">
@@ -1365,13 +1437,44 @@ export default function Admin() {
         {/* LOGOUT                                                          */}
         {/* --------------------------------------------------------------- */}
 
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-red-700"
-        >
-          Logout
-        </button>
+        <Dialog open={isLogoutConfirmOpen} onOpenChange={setIsLogoutConfirmOpen}>
+          <DialogTrigger asChild>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoggingOut}
+            >
+              {isLoggingOut ? "Logging out..." : "Logout"}
+            </button>
+          </DialogTrigger>
+          <DialogContent className="rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Confirm logout</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to log out from the admin panel?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-3 justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setIsLogoutConfirmOpen(false)}
+                disabled={isLoggingOut}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="bg-red-600 hover:bg-red-700"
+                onClick={confirmLogout}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? "Logging out..." : "Logout"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
       </main>
     </AppShell>
@@ -1388,12 +1491,14 @@ function StatCard({
   value,
   accent,
   warn,
+  action,
 }: {
   icon: any;
   label: string;
   value: string;
   accent?: boolean;
   warn?: boolean;
+  action?: React.ReactNode;
 }) {
   return (
     <motion.div
@@ -1406,8 +1511,7 @@ function StatCard({
         y: 0,
       }}
       className={cn(
-        "rounded-2xl p-4 shadow-card",
-
+        "w-full rounded-2xl p-4 shadow-card",
         accent
           ? "gradient-primary text-primary-foreground"
           : warn
@@ -1415,39 +1519,35 @@ function StatCard({
             : "bg-card",
       )}
     >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Icon
+            className={cn(
+              "h-4 w-4",
+              accent
+                ? ""
+                : warn
+                  ? "text-destructive"
+                  : "text-primary",
+            )}
+          />
 
-      <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "text-xs font-semibold uppercase tracking-wider",
+              accent ? "" : "text-muted-foreground",
+            )}
+          >
+            {label}
+          </span>
+        </div>
 
-        <Icon
-          className={cn(
-            "h-4 w-4",
-
-            accent
-              ? ""
-              : warn
-                ? "text-destructive"
-                : "text-primary",
-          )}
-        />
-
-        <span
-          className={cn(
-            "text-xs font-semibold uppercase tracking-wider",
-
-            accent
-              ? ""
-              : "text-muted-foreground",
-          )}
-        >
-          {label}
-        </span>
-
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
 
       <p className="mt-2 font-display text-2xl font-extrabold tabular-nums">
         {value}
       </p>
-
     </motion.div>
   );
 }

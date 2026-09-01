@@ -10,7 +10,6 @@ interface Props { children: ReactNode }
 const navItems = [
   { title: "Home", url: "/", icon: Home },
   { title: "Offers", url: "/offers", icon: Tag, accent: true },
-  { title: "Orders", url: "/orders", icon: Receipt },
   { title: "Admin", url: "/admin", icon: LayoutDashboard },
 ];
 

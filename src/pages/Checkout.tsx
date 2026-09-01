@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Smartphone, CreditCard, Wallet, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/hooks/useCart";
@@ -15,18 +15,9 @@ declare global {
   }
 }
 
-type Method = "upi" | "card" | "wallet";
-
-const methods: { id: Method; label: string; sub: string; icon: typeof Smartphone }[] = [
-  { id: "upi", label: "UPI", sub: "Pay via any UPI app", icon: Smartphone },
-  { id: "card", label: "Card", sub: "Credit / debit card", icon: CreditCard },
-  { id: "wallet", label: "Wallet", sub: "Apple Pay, Google Pay", icon: Wallet },
-];
-
 export default function Checkout() {
   const { cartId, items, totals, budget } = useCart();
   const navigate = useNavigate();
-  const [method, setMethod] = useState<Method>("upi");
   const [processing, setProcessing] = useState(false);
   const overBudget = totals.total > budget;
 
@@ -94,7 +85,7 @@ const pay = async () => {
     console.log("Payment verified:", response);
 
     toast.success("Payment verified successfully");
-    const tx = await checkoutCart(method);
+    const tx = await checkoutCart("razorpay");
 
 navigate(`/confirmation/${tx.id}`);
 
@@ -152,7 +143,7 @@ navigate(`/confirmation/${tx.id}`);
           <p className="mt-2 text-sm text-dark-green-foreground/70">Pick a payment method and confirm.</p>
         </motion.section>
 
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="mx-auto grid w-full max-w-[760px] gap-5">
           <section className="rounded-3xl bg-card p-5 shadow-card">
             <h2 className="mb-3 font-display text-base font-bold text-dark-green">Order summary</h2>
             <div className="space-y-1.5 text-sm">
@@ -187,58 +178,18 @@ navigate(`/confirmation/${tx.id}`);
                 You are over your ₹{budget.toFixed(2)} budget. Adjust the cart to continue.
               </div>
             )}
-          </section>
-
-          <section>
-            <h2 className="mb-2 px-1 font-display text-base font-bold text-dark-green">Payment method</h2>
-            <div className="space-y-2">
-              {methods.map((m) => {
-                const Icon = m.icon;
-                const active = method === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setMethod(m.id)}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-2xl border-2 p-4 text-left transition-all",
-                      active
-                        ? "border-primary bg-surface-green shadow-glow"
-                        : "border-transparent bg-card shadow-card hover:border-primary/30",
-                    )}
-                  >
-                    <div className={cn(
-                      "flex h-11 w-11 items-center justify-center rounded-xl",
-                      active ? "gradient-primary text-primary-foreground" : "bg-secondary text-secondary-foreground",
-                    )}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-dark-green">{m.label}</p>
-                      <p className="text-xs text-muted-foreground">{m.sub}</p>
-                    </div>
-                    <div className={cn(
-                      "flex h-6 w-6 items-center justify-center rounded-full border-2",
-                      active ? "border-primary bg-primary" : "border-border",
-                    )}>
-                      {active && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
 
             <Button
               variant="hero"
               size="lg"
-              className="mt-4 w-full"
+              className="mt-5 mx-auto block w-full max-w-[420px]"
               onClick={pay}
               disabled={processing || items.length === 0 || overBudget}
             >
               {processing ? (
                 <><Loader2 className="h-5 w-5 animate-spin" /> Processing...</>
               ) : (
-                `Pay ₹${totals.total.toFixed(2)}`
+                `Proceed to pay ₹${totals.total.toFixed(2)}`
               )}
             </Button>
           </section>

@@ -24,15 +24,6 @@ interface Product {
   shelf?: string;
 }
 
-const shuffle = <T,>(array: T[]): T[] => {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-};
-
 export function Recommendations({ items }: { items: CartItemRow[] }) {
   const [recs, setRecs] = useState<Product[]>([]);
 
@@ -85,7 +76,7 @@ export function Recommendations({ items }: { items: CartItemRow[] }) {
         ranked = [...ranked, ...fallback];
       }
 
-      setRecs(shuffle(ranked).slice(0, 6));
+      setRecs(ranked.slice(0, 6));
     };
 
     load();

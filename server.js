@@ -11,10 +11,25 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || "smartshop-super-secret-key";
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+const hasRazorpayConfig = Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+const razorpay = hasRazorpayConfig
+  ? new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    })
+  : null;
+
+function ensureRazorpayConfigured(res) {
+  if (!hasRazorpayConfig || !razorpay) {
+    res.status(500).json({
+      success: false,
+      message: "Razorpay keys are missing. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your .env file.",
+    });
+    return false;
+  }
+
+  return true;
+}
 
 const DB_CONFIG = {
   host: process.env.DB_HOST || "localhost",
@@ -194,6 +209,14 @@ async function ensureVendorCartRecords(vendorId, count = 1) {
   }
 }
 
+async function ensureActiveCartForAllVendors() {
+  const [vendors] = await pool.query("SELECT vendor_id FROM vendors");
+
+  for (const vendor of vendors) {
+    await ensureVendorCartRecords(vendor.vendor_id, 1);
+  }
+}
+
 async function createOrder({ vendorId, cartId, totalAmount, paymentStatus, items }) {
   const connection = await pool.getConnection();
 
@@ -313,6 +336,8 @@ app.post("/api/admin/login", async (req, res) => {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
+  await ensureVendorCartRecords(vendor.vendor_id, 1);
+
   const user = {
     vendor_id: vendor.vendor_id,
     username: vendor.username,
@@ -332,6 +357,7 @@ app.post("/api/admin/login", async (req, res) => {
 
 app.get("/api/admin/me", authMiddleware, async (req, res) => {
   const vendorId = Number(req.user.vendorId);
+  await ensureVendorCartRecords(vendorId, 1);
   const [rows] = await pool.query("SELECT vendor_id, username, store_name, location FROM vendors WHERE vendor_id = ?", [vendorId]);
 
   if (!rows.length) {
@@ -469,9 +495,116 @@ app.get("/api/vendor/:vendorId/carts", authMiddleware, vendorAccess, async (req,
   res.json(rows);
 });
 
+app.get("/api/vendor/:vendorId/analytics/popular-products", authMiddleware, vendorAccess, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT
+        p.product_id,
+        p.name,
+        p.category,
+        p.price,
+        p.stock_quantity,
+        p.aisle,
+        p.shelf,
+        SUM(oi.quantity) AS units_sold,
+        SUM(oi.quantity * oi.unit_price) AS revenue
+      FROM order_items oi
+      INNER JOIN orders o
+        ON o.order_id = oi.order_id
+      INNER JOIN products p
+        ON p.product_id = oi.product_id
+      WHERE o.vendor_id = ?
+        AND o.payment_status = 'paid'
+      GROUP BY
+        p.product_id,
+        p.name,
+        p.category,
+        p.price,
+        p.stock_quantity,
+        p.aisle,
+        p.shelf
+      ORDER BY units_sold DESC
+      LIMIT 10
+      `,
+      [req.params.vendorId]
+    );
+
+    res.json(rows);
+  } catch (error) {
+    console.error("Popular products error:", error);
+    res.status(500).json({
+      message: "Could not load popular products",
+    });
+  }
+});
+
 app.get("/api/vendor/:vendorId/orders", authMiddleware, vendorAccess, async (req, res) => {
-  const [rows] = await pool.query("SELECT * FROM orders WHERE vendor_id = ? ORDER BY created_at DESC", [req.params.vendorId]);
-  res.json(rows);
+  try {
+    const vendorId = Number(req.params.vendorId);
+    const [orderRows] = await pool.query(
+      "SELECT * FROM orders WHERE vendor_id = ? ORDER BY created_at DESC",
+      [vendorId],
+    );
+
+    const orderIds = orderRows.map((order) => order.order_id);
+    let itemRows = [];
+
+    if (orderIds.length) {
+      [itemRows] = await pool.query(
+        `SELECT oi.order_id, oi.product_id, oi.quantity, oi.unit_price, p.name AS product_name
+         FROM order_items oi
+         LEFT JOIN products p ON p.product_id = oi.product_id
+         WHERE oi.order_id IN (?)`,
+        [orderIds],
+      );
+    }
+
+    const itemsByOrder = new Map();
+
+    for (const item of itemRows) {
+      const current = itemsByOrder.get(item.order_id) ?? [];
+      current.push({
+        product_id: item.product_id,
+        product_name: item.product_name || "Unknown product",
+        quantity: Number(item.quantity),
+        unit_price: Number(item.unit_price),
+      });
+      itemsByOrder.set(item.order_id, current);
+    }
+
+    res.json(
+      orderRows.map((order) => ({
+        ...order,
+        total_amount: Number(order.total_amount),
+        items: itemsByOrder.get(order.order_id) || [],
+      })),
+    );
+  } catch (error) {
+    console.error("Vendor orders load failed:", error);
+    res.status(500).json({
+      message: "Could not load vendor orders",
+    });
+  }
+});
+
+app.get("/api/vendor/:vendorId/active-carts", authMiddleware, vendorAccess, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      "SELECT * FROM carts WHERE vendor_id = ? AND status = 'active' ORDER BY cart_number ASC",
+      [req.params.vendorId],
+    );
+
+    res.json({
+      count: rows.length,
+      carts: rows,
+    });
+  } catch (error) {
+    console.error("Active cart count failed:", error);
+    res.status(500).json({
+      message: "Could not load active carts",
+    });
+  }
 });
 
 app.post("/api/vendor/:vendorId/carts", authMiddleware, vendorAccess, async (req, res) => {
@@ -534,6 +667,10 @@ app.post("/api/payment/create-order", async (req, res) => {
       return res.status(400).json({
         message: "Valid payment amount is required",
       });
+    }
+
+    if (!ensureRazorpayConfigured(res)) {
+      return;
     }
 
     const options = {
@@ -610,8 +747,15 @@ app.post("/api/payment/verify", async (req, res) => {
 app.listen(PORT, async () => {
   try {
     await initDatabase();
+    await ensureActiveCartForAllVendors();
     console.log(`SmartShop backend running on http://localhost:${PORT}`);
     console.log(`MySQL connected: ${DB_CONFIG.host}:${DB_CONFIG.port}/${DB_CONFIG.database}`);
+
+    if (hasRazorpayConfig) {
+      console.log("Razorpay configured successfully.");
+    } else {
+      console.warn("Razorpay is not configured yet. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your .env file to enable payment checkout.");
+    }
   } catch (error) {
     console.error("MySQL connection failed:", error.message);
     process.exit(1);
