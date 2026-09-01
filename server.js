@@ -4,12 +4,17 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import mysql from "mysql2/promise";
-
+import Razorpay from "razorpay";
+import crypto from "crypto";
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || "smartshop-super-secret-key";
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 const DB_CONFIG = {
   host: process.env.DB_HOST || "localhost",
@@ -519,6 +524,87 @@ app.put("/api/vendor/:vendorId/inventory/:productId", authMiddleware, vendorAcce
 
   const [rows] = await pool.query("SELECT * FROM products WHERE product_id = ? AND vendor_id = ?", [req.params.productId, req.params.vendorId]);
   res.json(rows[0]);
+});
+
+app.post("/api/payment/create-order", async (req, res) => {
+  try {
+    const { amount } = req.body;
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({
+        message: "Valid payment amount is required",
+      });
+    }
+
+    const options = {
+      amount: Math.round(Number(amount) * 100),
+      currency: "INR",
+      receipt: `receipt_${Date.now()}`,
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    res.status(201).json({
+      success: true,
+      order,
+    });
+  } catch (error) {
+    console.error("Razorpay order creation failed:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Could not create Razorpay order",
+      error: error.message,
+    });
+  }
+});
+app.post("/api/payment/verify", async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    } = req.body;
+
+    if (
+      !razorpay_order_id ||
+      !razorpay_payment_id ||
+      !razorpay_signature
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing payment details",
+      });
+    }
+
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest("hex");
+
+    const isValid = expectedSignature === razorpay_signature;
+
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment verification failed",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Payment verified successfully",
+    });
+  } catch (error) {
+    console.error("Payment verification error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Payment verification failed",
+    });
+  }
 });
 
 app.listen(PORT, async () => {

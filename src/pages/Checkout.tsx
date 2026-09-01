@@ -9,6 +9,11 @@ import { checkoutCart } from "@/lib/cart-store";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { normalizeProductName } from "@/lib/demo-products";
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 type Method = "upi" | "card" | "wallet";
 
@@ -25,18 +30,110 @@ export default function Checkout() {
   const [processing, setProcessing] = useState(false);
   const overBudget = totals.total > budget;
 
-  const pay = async () => {
-    if (!cartId || items.length === 0 || overBudget) return;
-    setProcessing(true);
-    try {
-      const tx = await checkoutCart(method);
-      navigate(`/confirmation/${tx.id}`);
-    } catch (e: any) {
-      toast.error(e.message ?? "Payment failed");
-    } finally {
-      setProcessing(false);
+const pay = async () => {
+  if (!cartId || items.length === 0 || overBudget) return;
+
+  setProcessing(true);
+
+  try {
+    // Step 1: Create Razorpay order through our backend
+    const response = await fetch(
+      `${import.meta.env.VITE_API_BASE}/api/payment/create-order`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: totals.total,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Could not create payment order");
     }
-  };
+
+    const data = await response.json();
+
+    // Step 2: Configure Razorpay Checkout
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+
+      amount: data.order.amount,
+      currency: data.order.currency,
+
+      name: "Smart Shopping Cart",
+      description: "Shopping Cart Payment",
+
+      order_id: data.order.id,
+
+    handler: async function (response: any) {
+  try {
+    const verifyResponse = await fetch(
+      `${import.meta.env.VITE_API_BASE}/api/payment/verify`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          razorpay_order_id: response.razorpay_order_id,
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_signature: response.razorpay_signature,
+        }),
+      }
+    );
+
+    const result = await verifyResponse.json();
+
+    if (!verifyResponse.ok || !result.success) {
+      throw new Error(result.message || "Payment verification failed");
+    }
+
+    console.log("Payment verified:", response);
+
+    toast.success("Payment verified successfully");
+    const tx = await checkoutCart(method);
+
+navigate(`/confirmation/${tx.id}`);
+
+  } catch (error: any) {
+    console.error("Payment verification error:", error);
+    toast.error(error.message || "Payment verification failed");
+  } finally {
+    setProcessing(false);
+  }
+},
+
+      prefill: {
+        name: "",
+        email: "",
+        contact: "",
+      },
+
+      theme: {
+        color: "#3399cc",
+      },
+
+      modal: {
+        ondismiss: function () {
+          setProcessing(false);
+        },
+      },
+    };
+
+    // Step 3: Open Razorpay Checkout
+    const razorpay = new window.Razorpay(options);
+
+    razorpay.open();
+
+  } catch (e: any) {
+    console.error(e);
+    toast.error(e.message ?? "Payment failed");
+    setProcessing(false);
+  }
+};
 
   return (
     <AppShell>
